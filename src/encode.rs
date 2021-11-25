@@ -29,7 +29,7 @@ where
     let start_pos = output.stream_position()?;
 
     // A running lookup table of previously seen pixels
-    let mut lookup = [Pixel::default(); 64];
+    let mut lookup = [Pixel::transparent(); 64];
     let mut prev = Pixel::rgba(0, 0, 0, 255);
     let mut run: u16 = 0;
     let num_pixels = width * height;

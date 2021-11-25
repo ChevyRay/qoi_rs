@@ -8,6 +8,15 @@ pub enum Error {
 
     /// You tried to draw from an empty iterator.
     IteratorEmpty,
+
+    /// The decoding file didn't begin with `qoif`.
+    InvalidFileTypeMarker([u8; 4]),
+
+    /// The image you tried to load had no size.
+    NoImageSize,
+
+    /// The data block of your image has no bytes
+    NoImageData,
 }
 
 impl From<std::io::Error> for Error {
