@@ -24,6 +24,12 @@ fn read_i32<R: Read>(input: &mut R) -> Result<i32, Error> {
     Ok(i32::from_le_bytes(read::<R, 4>(input)?))
 }
 
+/// Decode the image encoded in the bytes provided by `input`. The return value
+/// is the image's `width`, `height`, and an iterator to parse the actual pixel
+/// data. If you just want to read the image size, you can ignore the iterator.
+///
+/// The amount of pixels on a successful decode will always be `width * height`,
+/// so you can use those values to pre-allocate your pixel buffer if you want.
 pub fn decode<R>(mut input: R) -> Result<(usize, usize, Pixels<R>), Error>
 where
     R: Read,
@@ -62,6 +68,9 @@ where
 }
 
 /// An iterator that parses pixels from the encoded image's data block.
+///
+/// Since this iterator parses the data as it goes, it iterates over
+/// `Result` values that will carry an error if the parser fails.
 pub struct Pixels<R> {
     input: R,
     remaining: usize,
@@ -74,6 +83,18 @@ impl<R> Pixels<R>
 where
     R: Read,
 {
+    /// Iterate over only the successfully parsed pixels. This iterator
+    /// will panic if the parser encounters an error.
+    pub fn unwrapped(&mut self) -> Unwrapped<'_, R> {
+        Unwrapped { pixels: self }
+    }
+
+    /// Iterate over only the successfully parsed pixels. This iterator
+    /// will silently end if the parser encounters an error.
+    pub fn ok(&mut self) -> Okay<'_, R> {
+        Okay { pixels: self }
+    }
+
     fn parse(&mut self) -> Result<Pixel, Error> {
         // If we've got a run, just count it down and return the same pixel again
         if self.run > 0 {
@@ -143,6 +164,7 @@ where
 {
     type Item = Result<Pixel, Error>;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         (self.remaining > 0).then(|| {
             let result = self.parse();
@@ -154,5 +176,43 @@ where
 
             result
         })
+    }
+}
+
+/// An iterator that parses pixels from the encoded image's data block.
+/// If the parser encounters an error, this iterator will panic.
+pub struct Unwrapped<'a, R> {
+    pixels: &'a mut Pixels<R>,
+}
+
+impl<'a, R> Iterator for Unwrapped<'a, R>
+where
+    R: Read,
+{
+    type Item = Pixel;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.pixels.next().and_then(|p| Some(p.unwrap()))
+    }
+}
+
+/// An iterator that parses pixels from the encoded image's data block.
+/// If the parser fails, this iterator will discard the error and finish.
+/// In this event, it is up to the user to check if the correct amount
+/// of pixels were parsed.
+pub struct Okay<'a, R> {
+    pixels: &'a mut Pixels<R>,
+}
+
+impl<'a, R> Iterator for Okay<'a, R>
+where
+    R: Read,
+{
+    type Item = Pixel;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.pixels.next().and_then(|p| p.ok())
     }
 }
