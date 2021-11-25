@@ -1,6 +1,8 @@
 use crate::{consts::*, Error, Pixel};
-use std::io::Read;
+use std::fs::File;
+use std::io::{BufReader, Read};
 use std::mem::MaybeUninit;
+use std::path::Path;
 
 #[inline]
 fn read<R: Read, const N: usize>(input: &mut R) -> Result<[u8; N], Error> {
@@ -22,6 +24,41 @@ fn read_u16<R: Read>(input: &mut R) -> Result<u16, Error> {
 #[inline]
 fn read_i32<R: Read>(input: &mut R) -> Result<i32, Error> {
     Ok(i32::from_le_bytes(read::<R, 4>(input)?))
+}
+
+/// Decode the image, filling `output` with the image's pixels.
+#[inline]
+pub fn decode_into_vec<R, P>(input: R, output: &mut Vec<P>) -> Result<(usize, usize), Error>
+where
+    R: Read,
+    P: From<Pixel>,
+{
+    let (w, h, pixels) = decode(input)?;
+    output.clear();
+    output.reserve(w * h);
+    for p in pixels {
+        output.push(p?.into());
+    }
+    Ok((w, h))
+}
+
+/// Decode the image file.
+#[inline]
+pub fn decode_file<F>(path: F) -> Result<(usize, usize, Pixels<BufReader<File>>), Error>
+where
+    F: AsRef<Path>,
+{
+    decode(BufReader::new(File::open(path)?))
+}
+
+/// Decode the image file, filling `output` with the image's pixels.
+#[inline]
+pub fn decode_file_into_vec<F, P>(path: F, output: &mut Vec<P>) -> Result<(usize, usize), Error>
+where
+    F: AsRef<Path>,
+    P: From<Pixel>,
+{
+    decode_into_vec(BufReader::new(File::open(path)?), output)
 }
 
 /// Decode the image encoded in the bytes provided by `input`. The return value
