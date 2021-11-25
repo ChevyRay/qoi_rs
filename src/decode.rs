@@ -100,6 +100,7 @@ where
             px: Pixel::rgba(0, 0, 0, 255),
             run: 0,
             lookup: [Pixel::transparent(); 64],
+            width,
         },
     ))
 }
@@ -114,6 +115,7 @@ pub struct Pixels<R> {
     px: Pixel,
     run: u16,
     lookup: [Pixel; 64],
+    width: usize,
 }
 
 impl<R> Pixels<R>
@@ -123,15 +125,28 @@ where
     /// Iterate over only the successfully parsed pixels. This iterator
     /// will panic if the parser encounters an error.
     #[inline]
-    pub fn unwrapped(&mut self) -> Unwrapped<'_, R> {
-        Unwrapped { pixels: self }
+    pub fn unwrapped(&mut self) -> Unwrapped<'_, Self> {
+        Unwrapped {
+            width: self.width,
+            pixels: self,
+        }
     }
 
     /// Iterate over only the successfully parsed pixels. This iterator
     /// will silently end if the parser encounters an error.
     #[inline]
-    pub fn ok(&mut self) -> Okay<'_, R> {
-        Okay { pixels: self }
+    pub fn ok(&mut self) -> Okay<'_, Self> {
+        Okay {
+            width: self.width,
+            pixels: self,
+        }
+    }
+
+    /// Iterate over the pixels while also supplying the position of
+    /// each pixel in the resulting image.
+    #[inline]
+    pub fn positioned(&mut self) -> Positioned<'_, Self> {
+        Positioned::new(self, self.width)
     }
 
     fn parse(&mut self) -> Result<Pixel, Error> {
@@ -220,15 +235,25 @@ where
 
 /// An iterator that parses pixels from the encoded image's data block.
 /// If the parser encounters an error, this iterator will panic.
-pub struct Unwrapped<'a, R> {
-    pixels: &'a mut Pixels<R>,
+pub struct Unwrapped<'a, I> {
+    pixels: &'a mut I,
+    width: usize,
 }
 
-impl<'a, R> Iterator for Unwrapped<'a, R>
+impl<'a, I> Unwrapped<'a, I> {
+    /// Iterate over the pixels while also supplying the position of
+    /// each pixel in the resulting image.
+    #[inline]
+    pub fn positioned(&mut self) -> Positioned<'_, Self> {
+        Positioned::new(self, self.width)
+    }
+}
+
+impl<'a, P, I> Iterator for Unwrapped<'a, I>
 where
-    R: Read,
+    I: Iterator<Item = Result<P, Error>>,
 {
-    type Item = Pixel;
+    type Item = P;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -240,18 +265,66 @@ where
 /// If the parser fails, this iterator will discard the error and finish.
 /// In this event, it is up to the user to check if the correct amount
 /// of pixels were parsed.
-pub struct Okay<'a, R> {
-    pixels: &'a mut Pixels<R>,
+pub struct Okay<'a, I> {
+    pixels: &'a mut I,
+    width: usize,
 }
 
-impl<'a, R> Iterator for Okay<'a, R>
+impl<'a, I> Okay<'a, I> {
+    /// Iterate over the pixels while also supplying the position of
+    /// each pixel in the resulting image.
+    #[inline]
+    pub fn positioned(&mut self) -> Positioned<'_, Self> {
+        Positioned::new(self, self.width)
+    }
+}
+
+impl<'a, P, I> Iterator for Okay<'a, I>
 where
-    R: Read,
+    I: Iterator<Item = Result<P, Error>>,
 {
-    type Item = Pixel;
+    type Item = P;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        self.pixels.next().and_then(|p| p.ok())
+        self.pixels.next().and_then(Result::ok)
+    }
+}
+
+pub struct Positioned<'a, I> {
+    pixels: &'a mut I,
+    width: usize,
+    x: usize,
+    y: usize,
+}
+
+impl<'a, I> Positioned<'a, I> {
+    fn new(pixels: &'a mut I, width: usize) -> Self {
+        Self {
+            pixels,
+            width,
+            x: 0,
+            y: 0,
+        }
+    }
+}
+
+impl<'a, P, I> Iterator for Positioned<'a, I>
+where
+    I: Iterator<Item = P>,
+{
+    type Item = (usize, usize, P);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.pixels.next().and_then(|p| {
+            let (x, y) = (self.x, self.y);
+            self.x += 1;
+            if self.x == self.width {
+                self.x = 0;
+                self.y += 1;
+            }
+            Some((x, y, p))
+        })
     }
 }
