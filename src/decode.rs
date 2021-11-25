@@ -122,12 +122,14 @@ where
 {
     /// Iterate over only the successfully parsed pixels. This iterator
     /// will panic if the parser encounters an error.
+    #[inline]
     pub fn unwrapped(&mut self) -> Unwrapped<'_, R> {
         Unwrapped { pixels: self }
     }
 
     /// Iterate over only the successfully parsed pixels. This iterator
     /// will silently end if the parser encounters an error.
+    #[inline]
     pub fn ok(&mut self) -> Okay<'_, R> {
         Okay { pixels: self }
     }
