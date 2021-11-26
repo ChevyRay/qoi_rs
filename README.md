@@ -7,8 +7,6 @@ for fast, lossless image compression.
 This was ported from Dominic's [original C code](https://github.com/phoboslab/qoi),
 but modified to be much more idiomatic in Rust.
 
-## About
-
 > *QOI encodes and decodes images in a lossless format. An encoded QOI image is
 usually around 10-30% larger than a decently optimized PNG image.*
 >
@@ -19,6 +17,35 @@ than stbi_image or libpng.*
 
 ## Usage
 
-```rust
+You can call `encode()` to encode an image. You supply it with an iterator
+of `Pixel` values, and a writer to output to.
 
+```rust
+use std::num::NonZeroUsize;
+use qoi::Pixel;
+
+// Create a 512x256 transparent image here to demonstrate
+let width = 512;
+let height = 256;
+let mut pixels: Vec<Pixel> = Vec::new();
+pixels.resize_with(width * height, || Pixel::transparent());
+
+// Encode the image and write it to a file
+let file = File::create("my_image.qoi").unwrap();
+qoi::encode(
+    NonZeroUsize::new(width).unwrap(),
+    NonZeroUsize::new(height).unwrap(),
+    pixels.into_iter(),
+    BufWriter::new(file),
+)
+.unwrap();
+```
+
+There are several helpful decode functions, here's the inverse of the above:
+
+```rust
+use qoi::Pixel;
+
+let mut pixels: Vec<Pixel> = Vec::new();
+qoi::decode_file_into_vec("my_image.qoi", &mut pixels).unwrap();
 ```
