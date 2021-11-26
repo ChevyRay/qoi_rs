@@ -2,8 +2,8 @@ use crate::{consts::*, Error, Pixel};
 use std::io::{Seek, SeekFrom, Write};
 use std::num::NonZeroUsize;
 
-/// Encodes the bytes supplied by `pixels` into the `output` stream. The iterator is expected
-/// to have `width * height` pixels in it. Returns the size of the encoded data.
+/// Encodes the pixels supplied by the `pixels` iterator into the `output` stream. The iterator is
+/// expected to have `width * height` pixels in it. Returns the size of the encoded data.
 pub fn encode<I, W>(
     width: NonZeroUsize,
     height: NonZeroUsize,
