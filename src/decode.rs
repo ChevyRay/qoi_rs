@@ -28,16 +28,15 @@ fn read_i32<R: Read>(input: &mut R) -> Result<i32, Error> {
 
 /// Decode the image, filling `output` with the image's pixels.
 #[inline]
-pub fn decode_into_vec<R, P>(input: R, output: &mut Vec<P>) -> Result<(usize, usize), Error>
+pub fn decode_into_vec<R>(input: R, output: &mut Vec<Pixel>) -> Result<(usize, usize), Error>
 where
     R: Read,
-    P: From<Pixel>,
 {
     let (w, h, pixels) = decode(input)?;
     output.clear();
     output.reserve(w * h);
     for p in pixels {
-        output.push(p?.into());
+        output.push(p?);
     }
     Ok((w, h))
 }
@@ -53,10 +52,9 @@ where
 
 /// Decode the image file, filling `output` with the image's pixels.
 #[inline]
-pub fn decode_file_into_vec<F, P>(path: F, output: &mut Vec<P>) -> Result<(usize, usize), Error>
+pub fn decode_file_into_vec<F>(path: F, output: &mut Vec<Pixel>) -> Result<(usize, usize), Error>
 where
     F: AsRef<Path>,
-    P: From<Pixel>,
 {
     decode_into_vec(BufReader::new(File::open(path)?), output)
 }
