@@ -24,11 +24,11 @@ of `Pixel` values, and a writer to output to.
 use std::num::NonZeroUsize;
 use qoi::Pixel;
 
-// Create a 512x256 transparent image here to demonstrate
+// Create a 512x256 red image here to demonstrate
 let width = 512;
 let height = 256;
 let mut pixels: Vec<Pixel> = Vec::new();
-pixels.resize_with(width * height, || Pixel::transparent());
+pixels.resize(width * height, Pixel::rgba(255, 0, 0, 255));
 
 // Encode the image and write it to a file
 let file = File::create("my_image.qoi").unwrap();
