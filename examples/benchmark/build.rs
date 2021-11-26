@@ -15,6 +15,7 @@ fn main() {
     cc::Build::new()
         .file("./src/qoi.c")
         .flag("-Wno-unsequenced")
+        .opt_level(3)
         .compile("qoi");
 
     // Download the PNG suite tarball
