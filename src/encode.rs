@@ -7,7 +7,7 @@ pub fn encode<I, W>(
     height: NonZeroUsize,
     mut pixels: I,
     mut output: W,
-) -> Result<(), Error>
+) -> Result<usize, Error>
 where
     I: Iterator<Item = Pixel>,
     W: Write + Seek,
@@ -15,6 +15,8 @@ where
     // Get our parameters into useful form
     let width = width.get();
     let height = height.get();
+
+    let start_pos = output.stream_position()?;
 
     // Write the file type marker and image size
     output.write(&MAGIC)?;
@@ -26,7 +28,7 @@ where
     // store the position so we can populate it later
     let size_pos = output.stream_position()?;
     output.write(&i32::to_le_bytes(0))?;
-    let start_pos = output.stream_position()?;
+    let data_pos = output.stream_position()?;
 
     // A running lookup table of previously seen pixels
     let mut lookup = [Pixel::transparent(); 64];
@@ -79,25 +81,28 @@ where
                 let da = (px.a as i16) - (prev.a as i16);
 
                 // If the difference is small enough, we'll encode the pixel as a difference
-                if (-15..17).contains(&dr)
-                    && (-15..17).contains(&dg)
-                    && (-15..17).contains(&db)
-                    && (-15..17).contains(&da)
+                if dr > -16
+                    && dr < 17
+                    && dg > -16
+                    && dg < 17
+                    && db > -16
+                    && db < 17
+                    && da > -16
+                    && da < 17
                 {
-                    if da == 0
-                        && (-1..3).contains(&dr)
-                        && (-1..3).contains(&dg)
-                        && (-1..3).contains(&db)
-                    {
+                    if da == 0 && dr > -2 && dr < 3 && dg > -2 && dg < 3 && db > -2 && db < 3 {
                         // If the difference can be encoded in 2 bits for each channel,
                         // pack all 3 differences into one byte (DIFF_8)
                         output.write(&[
                             DIFF_8 | ((((dr + 1) << 4) | (dg + 1) << 2 | (db + 1)) as u8)
                         ])?;
                     } else if da == 0
-                        && (-15..17).contains(&dr)
-                        && (-7..8).contains(&dg)
-                        && (-7..8).contains(&db)
+                        && dr > -16
+                        && dr < 17
+                        && dg > -8
+                        && dg < 9
+                        && db > -8
+                        && db < 9
                     {
                         // If the red difference fits in 5 bits and the green/blue fit in 4 bits,
                         // pack all the differences together into two bytes. (DIFF_16)
@@ -157,10 +162,10 @@ where
     // Go back and fill the size value with the size of the data block,
     // then return the stream back to the end position
     let end_pos = output.stream_position()?;
-    let size = (end_pos - start_pos) as i32;
+    let size = (end_pos - data_pos) as i32;
     output.seek(SeekFrom::Start(size_pos))?;
     output.write(&size.to_le_bytes())?;
     output.seek(SeekFrom::Start(end_pos))?;
 
-    Ok(())
+    Ok((end_pos - start_pos) as usize)
 }
