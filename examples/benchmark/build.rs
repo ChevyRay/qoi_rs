@@ -2,14 +2,13 @@ use downloader::download::Download;
 use downloader::Downloader;
 use git2::Repository;
 use std::fs::File;
-use std::io::Write;
 use std::path::Path;
 use tar::Archive;
 
 fn main() {
     // Clone the original C encoder/decoder repository
     let c_path = "./qoi_c";
-    std::fs::remove_dir_all(c_path).unwrap();
+    let _ = std::fs::remove_dir_all(c_path);
     let _ = Repository::clone("https://github.com/phoboslab/qoi", c_path).unwrap();
 
     // Compile and link the C files

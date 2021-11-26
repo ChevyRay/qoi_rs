@@ -1,9 +1,9 @@
-use image::{DynamicImage, EncodableLayout, GenericImageView, ImageFormat, RgbaImage};
+use image::ImageFormat;
 use qoi::Pixel;
 use rayon::prelude::*;
-use std::ffi::{c_void, CStr, CString, OsStr};
+use std::ffi::{c_void, CString};
 use std::fs::File;
-use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
+use std::io::{BufWriter, Read};
 use std::num::NonZeroUsize;
 use std::os::raw::c_char;
 use std::path::PathBuf;
@@ -11,10 +11,7 @@ use std::pin::Pin;
 use std::time::{Duration, Instant};
 
 extern "C" {
-    fn qoi_encode(data: *const u8, w: i32, h: i32, channels: i32, out_len: *mut i32) -> *mut u8;
     fn qoi_write(filename: *const c_char, data: *const u8, w: i32, h: i32, channels: i32) -> i32;
-
-    //void *qoi_read(const char *filename, int *out_w, int *out_h, int channels);
     fn qoi_read(filename: *const c_char, w: *mut i32, h: *mut i32, channels: i32) -> *mut u8;
 }
 
@@ -30,69 +27,6 @@ struct Results {
     qoi_rs_encode_time: Duration,
     qoi_rs_decode_time: Duration,
     qoi_rs_size: usize,
-}
-
-#[derive(Default)]
-struct DummyWriter {
-    bytes: Vec<u8>,
-    pos: usize,
-}
-impl DummyWriter {
-    fn with_capacity(cap: usize) -> Self {
-        Self {
-            bytes: Vec::with_capacity(cap),
-            pos: 0,
-        }
-    }
-}
-impl Write for DummyWriter {
-    #[inline]
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        if self.pos == self.bytes.len() {
-            self.bytes.extend_from_slice(buf);
-            self.pos += buf.len();
-        } else {
-            for &b in buf {
-                if self.pos < self.bytes.len() {
-                    unsafe { *self.bytes.get_unchecked_mut(self.pos) = b };
-                } else {
-                    self.bytes.push(b);
-                }
-                self.pos += 1;
-            }
-        }
-        Ok(buf.len())
-    }
-
-    #[inline]
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-impl Seek for DummyWriter {
-    #[inline]
-    fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
-        match pos {
-            SeekFrom::Start(pos) => {
-                self.pos = pos as usize;
-            }
-            SeekFrom::End(pos) => {
-                self.pos = ((self.bytes.len() as i64) + pos) as usize;
-            }
-            SeekFrom::Current(pos) => {
-                if pos > 0 {
-                    self.pos += pos as usize;
-                } else {
-                    self.pos -= (-pos) as usize;
-                }
-            }
-        }
-        Ok(self.pos as u64)
-    }
-
-    fn stream_position(&mut self) -> std::io::Result<u64> {
-        Ok(self.pos as u64)
-    }
 }
 
 fn main() {
@@ -115,7 +49,7 @@ fn main() {
 
             // Load the raw PNG file
             let mut bytes = Vec::with_capacity(8192 * 8192 * 4);
-            File::open(file).unwrap().read_to_end(&mut bytes);
+            File::open(file).unwrap().read_to_end(&mut bytes).unwrap();
             let image_size = bytes.len();
 
             // Decode the PNG file
@@ -162,7 +96,7 @@ fn main() {
 
             // Encode the image using the Rust QOI encoder
             let start = Instant::now();
-            let mut writer = BufWriter::new(File::create(&rs_file).unwrap());
+            let writer = BufWriter::new(File::create(&rs_file).unwrap());
             let qoi_rs_size = qoi::encode(
                 NonZeroUsize::new(w).unwrap(),
                 NonZeroUsize::new(h).unwrap(),
@@ -198,12 +132,12 @@ fn main() {
         })
         .collect();
 
-    let mut image_encode_time: Duration = results.iter().map(|r| r.image_encode_time).sum();
-    let mut image_decode_time: Duration = results.iter().map(|r| r.image_decode_time).sum();
-    let mut qoi_c_encode_time: Duration = results.iter().map(|r| r.qoi_c_encode_time).sum();
-    let mut qoi_c_decode_time: Duration = results.iter().map(|r| r.qoi_c_decode_time).sum();
-    let mut qoi_r_encode_time: Duration = results.iter().map(|r| r.qoi_rs_encode_time).sum();
-    let mut qoi_r_decode_time: Duration = results.iter().map(|r| r.qoi_rs_decode_time).sum();
+    let image_encode_time: Duration = results.iter().map(|r| r.image_encode_time).sum();
+    let image_decode_time: Duration = results.iter().map(|r| r.image_decode_time).sum();
+    let qoi_c_encode_time: Duration = results.iter().map(|r| r.qoi_c_encode_time).sum();
+    let qoi_c_decode_time: Duration = results.iter().map(|r| r.qoi_c_decode_time).sum();
+    let qoi_r_encode_time: Duration = results.iter().map(|r| r.qoi_rs_encode_time).sum();
+    let qoi_r_decode_time: Duration = results.iter().map(|r| r.qoi_rs_decode_time).sum();
 
     println!("total time: {:?}", Instant::now() - start);
 
