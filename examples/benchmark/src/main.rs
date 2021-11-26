@@ -20,12 +20,12 @@ struct Results {
     file: PathBuf,
     png_size: usize,
     qoi_size: usize,
-    image_decode_time: Duration,
-    image_encode_time: Duration,
-    qoi_c_encode_time: Duration,
-    qoi_c_decode_time: Duration,
-    qoi_rs_encode_time: Duration,
-    qoi_rs_decode_time: Duration,
+    image_decode_time: f64,
+    image_encode_time: f64,
+    qoi_c_encode_time: f64,
+    qoi_c_decode_time: f64,
+    qoi_rs_encode_time: f64,
+    qoi_rs_decode_time: f64,
 }
 
 fn main() {
@@ -52,14 +52,14 @@ fn main() {
             // Decode the PNG file
             let start = Instant::now();
             let img = image::open(file).unwrap();
-            let image_decode_time = Instant::now() - start;
+            let image_decode_time = (Instant::now() - start).as_secs_f64();
 
             // Encode the PNG file
             //let mut writer = DummyWriter::with_capacity(8192 * 8192 * 4);
             let mut writer = BufWriter::new(File::create(file).unwrap());
             let start = Instant::now();
             img.write_to(&mut writer, ImageFormat::Png).unwrap();
-            let image_encode_time = Instant::now() - start;
+            let image_encode_time = (Instant::now() - start).as_secs_f64();
             drop(writer);
 
             // Get the image size
@@ -76,19 +76,14 @@ fn main() {
             if len == 0 {
                 println!("FAILED TO ENCODE: {:?} ({}x{})", c_file, w, h);
             }
-            let qoi_c_encode_time = Instant::now() - start;
+            let qoi_c_encode_time = (Instant::now() - start).as_secs_f64();
             let qoi_size = len as usize;
 
             // Decode the image using the C QOI decoder
             let start = Instant::now();
             let (mut ww, mut hh) = (0, 0);
             let ptr = unsafe { qoi_read(c_file.as_ptr(), &mut ww, &mut hh, 4) };
-            if ww == 0 {
-                //println!("FAILED TO DECODE: {} -> {:?}", c_file, ptr);
-            }
-            //assert_eq!(ww as usize, w);
-            //assert_eq!(hh as usize, h);
-            let qoi_c_decode_time = Instant::now() - start;
+            let qoi_c_decode_time = (Instant::now() - start).as_secs_f64();
             unsafe { libc::free(ptr as *mut c_void) };
 
             // Encode the image using the Rust QOI encoder
@@ -101,7 +96,7 @@ fn main() {
                 writer,
             )
             .unwrap();
-            let qoi_rs_encode_time = Instant::now() - start;
+            let qoi_rs_encode_time = (Instant::now() - start).as_secs_f64();
             assert_eq!(qoi_size, qoi_rs_size);
 
             // Decode the image using the Rust QOI decoder
@@ -110,10 +105,7 @@ fn main() {
             let (ww, hh) = qoi::decode_file_into_vec(&rs_file, &mut _data).unwrap();
             assert_eq!(ww, w);
             assert_eq!(hh, h);
-            let qoi_rs_decode_time = Instant::now() - start;
-
-            // Free the qoi data
-            //unsafe { libc::free(ptr as *mut c_void) };
+            let qoi_rs_decode_time = (Instant::now() - start).as_secs_f64();
 
             Results {
                 file: file.to_path_buf(),
@@ -131,40 +123,16 @@ fn main() {
 
     let png_size = results.iter().map(|r| r.png_size).sum::<usize>() / results.len();
     let qoi_size = results.iter().map(|r| r.qoi_size).sum::<usize>() / results.len();
-    let image_encode_time = results
-        .iter()
-        .map(|r| r.image_encode_time)
-        .sum::<Duration>()
-        .as_secs_f64();
-    let image_decode_time = results
-        .iter()
-        .map(|r| r.image_decode_time)
-        .sum::<Duration>()
-        .as_secs_f64();
-    let qoi_c_encode_time = results
-        .iter()
-        .map(|r| r.qoi_c_encode_time)
-        .sum::<Duration>()
-        .as_secs_f64();
-    let qoi_c_decode_time = results
-        .iter()
-        .map(|r| r.qoi_c_decode_time)
-        .sum::<Duration>()
-        .as_secs_f64();
-    let qoi_r_encode_time = results
-        .iter()
-        .map(|r| r.qoi_rs_encode_time)
-        .sum::<Duration>()
-        .as_secs_f64();
-    let qoi_r_decode_time = results
-        .iter()
-        .map(|r| r.qoi_rs_decode_time)
-        .sum::<Duration>()
-        .as_secs_f64();
+    let image_encode_time: f64 = results.iter().map(|r| r.image_encode_time).sum();
+    let image_decode_time: f64 = results.iter().map(|r| r.image_decode_time).sum();
+    let qoi_c_encode_time: f64 = results.iter().map(|r| r.qoi_c_encode_time).sum();
+    let qoi_c_decode_time: f64 = results.iter().map(|r| r.qoi_c_decode_time).sum();
+    let qoi_r_encode_time: f64 = results.iter().map(|r| r.qoi_rs_encode_time).sum();
+    let qoi_r_decode_time: f64 = results.iter().map(|r| r.qoi_rs_decode_time).sum();
 
-    /*for result in &results {
+    for result in &results {
         println!("{:#?}", result);
-    }*/
+    }
 
     let r = results.len() as f64;
 
