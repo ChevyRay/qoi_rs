@@ -47,5 +47,7 @@ There are several helpful decode functions, here's the inverse of the above:
 use qoi::Pixel;
 
 let mut pixels: Vec<Pixel> = Vec::new();
-qoi::decode_file_into_vec("my_image.qoi", &mut pixels).unwrap();
+let (width, height) = 
+    qoi::decode_file_into_vec("my_image.qoi", &mut pixels)
+    .unwrap();
 ```
