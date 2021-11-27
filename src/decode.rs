@@ -17,11 +17,6 @@ fn read_u8<R: Read>(input: &mut R) -> Result<u8, Error> {
 }
 
 #[inline]
-fn read_u16<R: Read>(input: &mut R) -> Result<u16, Error> {
-    Ok(u16::from_be_bytes(read::<R, 2>(input)?))
-}
-
-#[inline]
 fn read_u32<R: Read>(input: &mut R) -> Result<u32, Error> {
     Ok(u32::from_be_bytes(read::<R, 4>(input)?))
 }
@@ -76,8 +71,8 @@ where
     }
 
     // Parse the image size
-    let width = read_u16(&mut input)? as usize;
-    let height = read_u16(&mut input)? as usize;
+    let width = read_u32(&mut input)? as usize;
+    let height = read_u32(&mut input)? as usize;
     let _channels = read_u8(&mut input)?;
     let _color_space = read_u8(&mut input)?;
     if width == 0 || height == 0 {
