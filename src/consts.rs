@@ -1,4 +1,6 @@
-pub const MAGIC: [u8; 4] = [b'q', b'o', b'i', b'f'];
+//pub const MAGIC: [u8; 4] = [b'q', b'o', b'i', b'f'];
+pub const MAGIC: u32 =
+    ((b'q' as u32) << 24) | ((b'o' as u32) << 16) | ((b'i' as u32) << 8) | (b'f' as u32);
 
 pub const INDEX: u8 = 0x0;
 pub const RUN_8: u8 = 0x40;

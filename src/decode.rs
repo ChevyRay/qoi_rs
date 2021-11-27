@@ -18,12 +18,12 @@ fn read_u8<R: Read>(input: &mut R) -> Result<u8, Error> {
 
 #[inline]
 fn read_u16<R: Read>(input: &mut R) -> Result<u16, Error> {
-    Ok(u16::from_le_bytes(read::<R, 2>(input)?))
+    Ok(u16::from_be_bytes(read::<R, 2>(input)?))
 }
 
 #[inline]
-fn read_i32<R: Read>(input: &mut R) -> Result<i32, Error> {
-    Ok(i32::from_le_bytes(read::<R, 4>(input)?))
+fn read_u32<R: Read>(input: &mut R) -> Result<u32, Error> {
+    Ok(u32::from_be_bytes(read::<R, 4>(input)?))
 }
 
 /// Decode the image, filling `output` with the image's pixels.
@@ -70,9 +70,9 @@ where
     R: Read,
 {
     // Parse the magic filetype marker.
-    let magic = read::<R, 4>(&mut input)?;
+    let magic = read_u32(&mut input)?;
     if magic != MAGIC {
-        return Err(Error::InvalidFileTypeMarker(magic));
+        return Err(Error::InvalidFileTypeMarker(magic.to_be_bytes()));
     }
 
     // Parse the image size
@@ -80,12 +80,6 @@ where
     let height = read_u16(&mut input)? as usize;
     if width == 0 || height == 0 {
         return Err(Error::NoImageSize);
-    }
-
-    // Parse the size of our data block
-    let data_len = read_i32(&mut input)? as usize;
-    if data_len == 0 {
-        return Err(Error::NoImageData);
     }
 
     // Return the image info and an iterator to decode the pixels

@@ -1,5 +1,5 @@
 use crate::{consts::*, Error, Pixel};
-use std::io::{Seek, SeekFrom, Write};
+use std::io::Write;
 use std::num::NonZeroUsize;
 
 /// Encodes the pixels supplied by the `pixels` iterator into the `output` stream. The iterator is
@@ -12,25 +12,22 @@ pub fn encode<I, W>(
 ) -> Result<usize, Error>
 where
     I: Iterator<Item = Pixel>,
-    W: Write + Seek,
+    W: Write,
 {
     // Get our parameters into useful form
     let width = width.get();
     let height = height.get();
 
-    let start_pos = output.stream_position()?;
+    let mut num_bytes = 0;
+    let mut write = |buf: &[u8]| {
+        num_bytes += buf.len();
+        output.write(buf)
+    };
 
     // Write the file type marker and image size
-    output.write(&MAGIC)?;
-    output.write(&(width as u16).to_le_bytes())?;
-    output.write(&(height as u16).to_le_bytes())?;
-
-    // This will contain the amount of bytes in the data block, but
-    // we don't know it yet, so just fill it with a temp value and
-    // store the position so we can populate it later
-    let size_pos = output.stream_position()?;
-    output.write(&i32::to_le_bytes(0))?;
-    let data_pos = output.stream_position()?;
+    write(&MAGIC.to_be_bytes())?;
+    write(&(width as u32).to_be_bytes())?;
+    write(&(height as u32).to_be_bytes())?;
 
     // A running lookup table of previously seen pixels
     let mut lookup = [Pixel::transparent(); 64];
@@ -55,11 +52,11 @@ where
             if run < 33 {
                 // If it's a short run, encode it in 1 byte (RUN_8)
                 run -= 1;
-                output.write(&[RUN_8 | (run as u8)])?;
+                write(&[RUN_8 | (run as u8)])?;
             } else {
                 // If it's a long run, encode it in 2 bytes (RUN_16)
                 run -= 33;
-                output.write(&[RUN_16 | ((run >> 8) as u8), run as u8])?;
+                write(&[RUN_16 | ((run >> 8) as u8), run as u8])?;
             }
             run = 0;
         }
@@ -71,7 +68,7 @@ where
             if lookup[index] == px {
                 // If our pixel is in the lookup table, we can just write an
                 // index byte indicating which position in the table it's at
-                output.write(&[INDEX | index_u8])?;
+                write(&[INDEX | index_u8])?;
             } else {
                 // If the pixel is different than the lookup value, overwrite it
                 lookup[index] = px;
@@ -95,9 +92,7 @@ where
                     if da == 0 && dr > -2 && dr < 3 && dg > -2 && dg < 3 && db > -2 && db < 3 {
                         // If the difference can be encoded in 2 bits for each channel,
                         // pack all 3 differences into one byte (DIFF_8)
-                        output.write(&[
-                            DIFF_8 | ((((dr + 1) << 4) | (dg + 1) << 2 | (db + 1)) as u8)
-                        ])?;
+                        write(&[DIFF_8 | ((((dr + 1) << 4) | (dg + 1) << 2 | (db + 1)) as u8)])?;
                     } else if da == 0
                         && dr > -16
                         && dr < 17
@@ -108,14 +103,14 @@ where
                     {
                         // If the red difference fits in 5 bits and the green/blue fit in 4 bits,
                         // pack all the differences together into two bytes. (DIFF_16)
-                        output.write(&[
+                        write(&[
                             DIFF_16 | ((dr + 15) as u8),
                             (((dg + 7) << 4) | (db + 7)) as u8,
                         ])?;
                     } else {
                         // If each channel requires 5 bits to store its difference, then we pack
                         // them all into 3 bytes (DIFF_24)
-                        output.write(&[
+                        write(&[
                             DIFF_24 | (((dr + 15) >> 1) as u8),
                             (((dr + 15) << 7) | ((dg + 15) << 2) | ((db + 15) >> 3)) as u8,
                             (((db + 15) << 5) | (da + 15)) as u8,
@@ -148,7 +143,7 @@ where
                         chunk[i] = px.a;
                         i += 1;
                     }
-                    output.write(&chunk[..i])?;
+                    write(&chunk[..i])?;
                 }
             }
         }
@@ -159,15 +154,8 @@ where
     }
 
     // Mark the end of the data block with 4 empty bytes
-    output.write(&[0, 0, 0, 0])?;
+    write(&[0, 0, 0, 0])?;
 
-    // Go back and fill the size value with the size of the data block,
-    // then return the stream back to the end position
-    let end_pos = output.stream_position()?;
-    let size = (end_pos - data_pos) as i32;
-    output.seek(SeekFrom::Start(size_pos))?;
-    output.write(&size.to_le_bytes())?;
-    output.seek(SeekFrom::Start(end_pos))?;
-
-    Ok((end_pos - start_pos) as usize)
+    // Return the total amount of bytes that were encoded
+    Ok(num_bytes)
 }
