@@ -75,46 +75,46 @@ where
                 lookup[index] = px;
 
                 // Get the difference between this and the previous pixel
-                let dr = (px.r as i16) - (prev.r as i16);
-                let dg = (px.g as i16) - (prev.g as i16);
-                let db = (px.b as i16) - (prev.b as i16);
-                let da = (px.a as i16) - (prev.a as i16);
+                let vr = (px.r as i16) - (prev.r as i16);
+                let vg = (px.g as i16) - (prev.g as i16);
+                let vb = (px.b as i16) - (prev.b as i16);
+                let va = (px.a as i16) - (prev.a as i16);
 
                 // If the difference is small enough, we'll encode the pixel as a difference
-                if dr > -16
-                    && dr < 17
-                    && dg > -16
-                    && dg < 17
-                    && db > -16
-                    && db < 17
-                    && da > -16
-                    && da < 17
+                if vr > -17
+                    && vr < 16
+                    && vg > -17
+                    && vg < 16
+                    && vb > -17
+                    && vb < 16
+                    && va > -17
+                    && va < 16
                 {
-                    if da == 0 && dr > -2 && dr < 3 && dg > -2 && dg < 3 && db > -2 && db < 3 {
+                    if va == 0 && vr > -3 && vr < 2 && vg > -3 && vg < 2 && vb > -3 && vb < 2 {
                         // If the difference can be encoded in 2 bits for each channel,
                         // pack all 3 differences into one byte (DIFF_8)
-                        write(&[DIFF_8 | ((((dr + 1) << 4) | (dg + 1) << 2 | (db + 1)) as u8)])?;
-                    } else if da == 0
-                        && dr > -16
-                        && dr < 17
-                        && dg > -8
-                        && dg < 9
-                        && db > -8
-                        && db < 9
+                        write(&[DIFF_8 | ((((vr + 2) << 4) | (vg + 2) << 2 | (vb + 2)) as u8)])?;
+                    } else if va == 0
+                        && vr > -17
+                        && vr < 16
+                        && vg > -9
+                        && vg < 8
+                        && vb > -9
+                        && vb < 8
                     {
                         // If the red difference fits in 5 bits and the green/blue fit in 4 bits,
                         // pack all the differences together into two bytes. (DIFF_16)
                         write(&[
-                            DIFF_16 | ((dr + 15) as u8),
-                            (((dg + 7) << 4) | (db + 7)) as u8,
+                            DIFF_16 | ((vr + 16) as u8),
+                            (((vg + 8) << 4) | (vb + 8)) as u8,
                         ])?;
                     } else {
                         // If each channel requires 5 bits to store its difference, then we pack
                         // them all into 3 bytes (DIFF_24)
                         write(&[
-                            DIFF_24 | (((dr + 15) >> 1) as u8),
-                            (((dr + 15) << 7) | ((dg + 15) << 2) | ((db + 15) >> 3)) as u8,
-                            (((db + 15) << 5) | (da + 15)) as u8,
+                            DIFF_24 | (((vr + 16) >> 1) as u8),
+                            (((vr + 16) << 7) | ((vg + 16) << 2) | ((vb + 16) >> 3)) as u8,
+                            (((vb + 16) << 5) | (va + 16)) as u8,
                         ])?;
                     }
                 } else {

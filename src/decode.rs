@@ -162,26 +162,26 @@ where
                 let b2 = read_u8(&mut self.input)?;
                 self.run = ((((b1 & 0x1f) as u16) << 8) | (b2 as u16)) + 32;
             } else if (b1 & MASK_2) == DIFF_8 {
-                self.px.r = self.px.r.wrapping_add(((b1 >> 4) & 0x03).wrapping_sub(1));
-                self.px.g = self.px.g.wrapping_add(((b1 >> 2) & 0x03).wrapping_sub(1));
-                self.px.b = self.px.b.wrapping_add((b1 & 0x03).wrapping_sub(1));
+                self.px.r = self.px.r.wrapping_add(((b1 >> 4) & 0x03).wrapping_sub(2));
+                self.px.g = self.px.g.wrapping_add(((b1 >> 2) & 0x03).wrapping_sub(2));
+                self.px.b = self.px.b.wrapping_add((b1 & 0x03).wrapping_sub(2));
             } else if (b1 & MASK_3) == DIFF_16 {
                 let b2 = read_u8(&mut self.input)?;
-                self.px.r = self.px.r.wrapping_add((b1 & 0x1f).wrapping_sub(15));
-                self.px.g = self.px.g.wrapping_add((b2 >> 4).wrapping_sub(7));
-                self.px.b = self.px.b.wrapping_add((b2 & 0x0f).wrapping_sub(7));
+                self.px.r = self.px.r.wrapping_add((b1 & 0x1f).wrapping_sub(16));
+                self.px.g = self.px.g.wrapping_add((b2 >> 4).wrapping_sub(8));
+                self.px.b = self.px.b.wrapping_add((b2 & 0x0f).wrapping_sub(8));
             } else if (b1 & MASK_4) == DIFF_24 {
                 let [b2, b3] = read::<R, 2>(&mut self.input)?;
                 self.px.r = self
                     .px
                     .r
-                    .wrapping_add((((b1 & 0x0f) << 1) | (b2 >> 7)).wrapping_sub(15));
-                self.px.g = self.px.g.wrapping_add(((b2 & 0x7c) >> 2).wrapping_sub(15));
+                    .wrapping_add((((b1 & 0x0f) << 1) | (b2 >> 7)).wrapping_sub(16));
+                self.px.g = self.px.g.wrapping_add(((b2 & 0x7c) >> 2).wrapping_sub(16));
                 self.px.b = self
                     .px
                     .b
-                    .wrapping_add((((b2 & 0x03) << 3) | ((b3 & 0xe0) >> 5)).wrapping_sub(15));
-                self.px.a = self.px.a.wrapping_add((b3 & 0x1f).wrapping_sub(15));
+                    .wrapping_add((((b2 & 0x03) << 3) | ((b3 & 0xe0) >> 5)).wrapping_sub(16));
+                self.px.a = self.px.a.wrapping_add((b3 & 0x1f).wrapping_sub(16));
             } else if (b1 & MASK_4) == COLOR {
                 if (b1 & 8) != 0 {
                     self.px.r = read_u8(&mut self.input)?;
