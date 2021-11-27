@@ -34,6 +34,9 @@ fn main() {
         }
     }
 
-    let mut archive = Archive::new(File::open("./img/images.tar").unwrap());
-    archive.unpack("./img").unwrap();
+    // Extract the PNG suite tarball
+    if !File::open("./img/images/kodak/kodim01.png").is_ok() {
+        let mut archive = Archive::new(File::open("./img/images.tar").unwrap());
+        archive.unpack("./img").unwrap();
+    }
 }
