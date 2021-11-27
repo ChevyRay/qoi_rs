@@ -48,9 +48,8 @@ fn main() {
     println!("PROCESSING {} FILES...", images.len());
 
     let results: Vec<Results> = images
-        .iter()
+        .par_iter()
         .map(|file| {
-            //let dir = file.parent().unwrap().to_string_lossy().to_string();
             let name = file.file_name().unwrap().to_string_lossy().to_string();
             let c_file = (out_dir.clone() + "/c_" + &name).replace(".png", ".qoi");
             let rs_file = (out_dir.clone() + "/r_" + &name).replace(".png", ".qoi");
@@ -67,7 +66,6 @@ fn main() {
             let image_decode_time = (Instant::now() - start).as_secs_f64();
 
             // Encode the PNG file
-            //let mut writer = DummyWriter::with_capacity(8192 * 8192 * 4);
             let mut writer = BufWriter::new(File::create(file).unwrap());
             let start = Instant::now();
             img.write_to(&mut writer, ImageFormat::Png).unwrap();
@@ -90,18 +88,14 @@ fn main() {
             let desc_ptr = &desc as *const qoi_desc as *const u8;
             let desc_mut_ptr = &mut desc as *mut qoi_desc as *mut u8;
 
-            println!("\t\tencoding c...");
-
             // Encode the image using the C QOI encoder
             let start = Instant::now();
             let len = unsafe { qoi_write(c_file.as_ptr(), pin.as_ptr(), desc_ptr) };
             if len == 0 {
-                println!("FAILED TO ENCODE: {:?} ({}x{})", c_file, w, h);
+                panic!("FAILED TO ENCODE: {:?} ({}x{})", c_file, w, h);
             }
             let qoi_c_encode_time = (Instant::now() - start).as_secs_f64();
             let qoi_size = len as usize;
-
-            println!("\t\tdecoding c...");
 
             // Decode the image using the C QOI decoder
             let start = Instant::now();
@@ -110,8 +104,6 @@ fn main() {
             unsafe { libc::free(ptr as *mut c_void) };
             assert_eq!(desc.width as usize, w);
             assert_eq!(desc.height as usize, h);
-
-            println!("\t\tencoding rust...");
 
             // Encode the image using the Rust QOI encoder
             let start = Instant::now();
@@ -125,8 +117,6 @@ fn main() {
             .unwrap();
             let qoi_rs_encode_time = (Instant::now() - start).as_secs_f64();
             assert_eq!(qoi_size, qoi_rs_size);
-
-            println!("\t\tdecoding rust...");
 
             // Decode the image using the Rust QOI decoder
             let start = Instant::now();
@@ -197,8 +187,6 @@ fn read_dir(dir: PathBuf, images: &mut Vec<PathBuf>) {
             let entry = entry.unwrap();
             if let Some(ext) = entry.path().extension() {
                 if ext == "png" {
-                    //println!("{:?}", entry.path().file_name().unwrap());
-                    //println!("{:?}\n\t{:?}", entry.path(), entry.path().parent().unwrap());
                     images.push(entry.path());
                 }
             } else {
