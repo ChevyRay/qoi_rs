@@ -24,10 +24,11 @@ where
         output.write(buf)
     };
 
-    // Write the file type marker and image size
+    // Write the file header
     write(&MAGIC.to_be_bytes())?;
     write(&(width as u32).to_be_bytes())?;
     write(&(height as u32).to_be_bytes())?;
+    write(&[4, 0])?;
 
     // A running lookup table of previously seen pixels
     let mut lookup = [Pixel::transparent(); 64];

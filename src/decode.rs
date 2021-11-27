@@ -78,6 +78,8 @@ where
     // Parse the image size
     let width = read_u16(&mut input)? as usize;
     let height = read_u16(&mut input)? as usize;
+    let _channels = read_u8(&mut input)?;
+    let _color_space = read_u8(&mut input)?;
     if width == 0 || height == 0 {
         return Err(Error::NoImageSize);
     }
