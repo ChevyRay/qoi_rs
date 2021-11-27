@@ -11,8 +11,17 @@ use std::pin::Pin;
 use std::time::{Duration, Instant};
 
 extern "C" {
-    fn qoi_write(filename: *const c_char, data: *const u8, w: i32, h: i32, channels: i32) -> i32;
-    fn qoi_read(filename: *const c_char, w: *mut i32, h: *mut i32, channels: i32) -> *mut u8;
+    fn qoi_write(filename: *const c_char, data: *const u8, desc: *const u8) -> i32;
+    fn qoi_read(filename: *const c_char, desc: *mut u8, channels: i32) -> *mut u8;
+}
+
+#[repr(C)]
+#[allow(non_camel_case_types)]
+struct qoi_desc {
+    width: u32,
+    height: u32,
+    channels: u8,
+    colorspace: u8,
 }
 
 #[derive(Debug)]
@@ -33,18 +42,21 @@ fn main() {
     let _ = std::fs::remove_dir_all(&out_dir);
     std::fs::create_dir(&out_dir).unwrap();
 
-    let start = Instant::now();
-
     let mut images = Vec::new();
     read_dir(PathBuf::from("./img/images"), &mut images);
+
+    println!("PROCESSING {} FILES...", images.len());
+
     let results: Vec<Results> = images
-        .par_iter()
+        .iter()
         .map(|file| {
             //let dir = file.parent().unwrap().to_string_lossy().to_string();
             let name = file.file_name().unwrap().to_string_lossy().to_string();
             let c_file = (out_dir.clone() + "/c_" + &name).replace(".png", ".qoi");
             let rs_file = (out_dir.clone() + "/r_" + &name).replace(".png", ".qoi");
             let c_file = CString::new(c_file).unwrap();
+
+            println!("\t{}", name);
 
             // Load the raw PNG file
             let png_size = { File::open(file).unwrap().seek(SeekFrom::End(0)).unwrap() as usize };
@@ -69,22 +81,37 @@ fn main() {
             let pixels: Vec<Pixel> = img.pixels().map(|p| p.0.into()).collect();
 
             let pin = Pin::new(img);
+            let mut desc = qoi_desc {
+                width: w as u32,
+                height: h as u32,
+                channels: 4,
+                colorspace: 0,
+            };
+            let desc_ptr = &desc as *const qoi_desc as *const u8;
+            let desc_mut_ptr = &mut desc as *mut qoi_desc as *mut u8;
+
+            println!("\t\tencoding c...");
 
             // Encode the image using the C QOI encoder
             let start = Instant::now();
-            let len = unsafe { qoi_write(c_file.as_ptr(), pin.as_ptr(), w as i32, h as i32, 4) };
+            let len = unsafe { qoi_write(c_file.as_ptr(), pin.as_ptr(), desc_ptr) };
             if len == 0 {
                 println!("FAILED TO ENCODE: {:?} ({}x{})", c_file, w, h);
             }
             let qoi_c_encode_time = (Instant::now() - start).as_secs_f64();
             let qoi_size = len as usize;
 
+            println!("\t\tdecoding c...");
+
             // Decode the image using the C QOI decoder
             let start = Instant::now();
-            let (mut ww, mut hh) = (0, 0);
-            let ptr = unsafe { qoi_read(c_file.as_ptr(), &mut ww, &mut hh, 4) };
+            let ptr = unsafe { qoi_read(c_file.as_ptr(), desc_mut_ptr, 4) };
             let qoi_c_decode_time = (Instant::now() - start).as_secs_f64();
             unsafe { libc::free(ptr as *mut c_void) };
+            assert_eq!(desc.width as usize, w);
+            assert_eq!(desc.height as usize, h);
+
+            println!("\t\tencoding rust...");
 
             // Encode the image using the Rust QOI encoder
             let start = Instant::now();
@@ -98,6 +125,8 @@ fn main() {
             .unwrap();
             let qoi_rs_encode_time = (Instant::now() - start).as_secs_f64();
             assert_eq!(qoi_size, qoi_rs_size);
+
+            println!("\t\tdecoding rust...");
 
             // Decode the image using the Rust QOI decoder
             let start = Instant::now();
@@ -130,9 +159,9 @@ fn main() {
     let qoi_r_encode_time: f64 = results.iter().map(|r| r.qoi_rs_encode_time).sum();
     let qoi_r_decode_time: f64 = results.iter().map(|r| r.qoi_rs_decode_time).sum();
 
-    for result in &results {
-        println!("{:#?}", result);
-    }
+    //for result in &results {
+    //    println!("{:#?}", result);
+    //}
 
     let r = results.len() as f64;
 
