@@ -2,7 +2,8 @@
 
 This is a Rust encoder and decoder for Dominic Szablewski's
 [QOI format](https://phoboslab.org/log/2021/11/qoi-fast-lossless-image-compression)
-for fast, lossless image compression.
+for fast, lossless image compression. See the [QOI File Format Specification](https://github.com/phoboslab/qoi/issues/37)
+for more details.
 
 This was ported from Dominic's [original C code](https://github.com/phoboslab/qoi),
 but modified to be much more idiomatic in Rust.
