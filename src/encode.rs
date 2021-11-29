@@ -21,7 +21,7 @@ where
     let mut num_bytes = 0;
     let mut write = |buf: &[u8]| {
         num_bytes += buf.len();
-        output.write(buf)
+        output.write_all(buf)
     };
 
     // Write the file header
